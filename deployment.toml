@@ -1,0 +1,11 @@
+[build]
+base = "."
+command = "pip install -r requirements.txt && python super_advanced_ai.py"
+publish = "."
+
+[build.environment]
+PYTHONUNBUFFERED = "1"
+
+[dev]
+command = "python super_advanced_ai.py"
+port = 8000

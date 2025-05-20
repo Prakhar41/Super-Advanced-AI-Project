@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl font-bold text-green-600">AI Assistant</h1>
+                <div class="feature-toggle">
+                    <button class="toggle-button" onclick="toggleFeature('emotion')">
+                        <i class="fas fa-smile"></i> Emotion Analysis
+                    </button>
+                    <button class="toggle-button" onclick="toggleFeature('image')">
+                        <i class="fas fa-camera"></i> Image Processing
+                    </button>
+                    <button class="toggle-button" onclick="toggleFeature('voice')">
+                        <i class="fas fa-microphone"></i> Voice Input
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Container -->
+            <div class="chat-container mb-4">
+                <div class="chat-area" id="chatArea">
+                    <!-- Chat messages will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div class="flex space-x-4">
+                    <div class="flex-1">
+                        <textarea 
+                            id="userInput" 
+                            class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:border-blue-500"
+                            placeholder="Type your message..."
+                            rows="2"
+                        ></textarea>
+                    </div>
+                    <div class="flex items-center">
+                        <button 
+                            id="sendButton" 
+                            class="send-button"
+                        >
+                            <i class="fas fa-paper-plane mr-2"></i>Send
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Emotion Analysis Display -->
+                <div class="emotion-analysis hidden mt-4" id="emotionAnalysis">
+                    <h3 class="text-lg font-semibold mb-2">Emotion Analysis</h3>
+                    <div class="flex justify-around">
+                        <div class="emotion-meter">
+                            <div class="emotion-bar positive" id="positiveBar"></div>
+                        </div>
+                        <div class="emotion-meter">
+                            <div class="emotion-bar negative" id="negativeBar"></div>
+                        </div>
+                        <div class="emotion-meter">
+                            <div class="emotion-bar neutral" id="neutralBar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Upload -->
+                <div class="image-upload hidden mt-4" id="imageUpload">
+                    <input type="file" id="imageInput" accept="image/*" class="hidden">
+                    <button onclick="document.getElementById('imageInput').click()" class="send-button">
+                        <i class="fas fa-upload mr-2"></i>Upload Image
+                    </button>
+                    <div class="image-preview mt-4" id="imagePreview"></div>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div class="text-center mt-4 hidden" id="loading">
+                <div class="loading"></div>
+                <p class="mt-2">Processing...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Feature toggles
+        function toggleFeature(feature) {
+            const emotionAnalysis = document.getElementById('emotionAnalysis');
+            const imageUpload = document.getElementById('imageUpload');
+            
+            if (feature === 'emotion') {
+                emotionAnalysis.classList.toggle('hidden');
+            } else if (feature === 'image') {
+                imageUpload.classList.toggle('hidden');
+            }
+        }
+
+        // Chat functionality
+        const chatArea = document.getElementById('chatArea');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const loading = document.getElementById('loading');
+
+        // Send message when Enter is pressed
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendButton.click();
+            }
+        });
+
+        // Send message when button is clicked
+        sendButton.addEventListener('click', async function() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // Add user message to chat
+            addMessage(message, 'user');
+            userInput.value = '';
+
+            // Show loading
+            loading.classList.remove('hidden');
+
+            try {
+                // Send request to AI
+                const response = await fetch('/process_text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: message })
+                });
+
+                const data = await response.json();
+                addMessage(data.response, 'ai');
+
+                // Update emotion analysis if visible
+                if (!document.getElementById('emotionAnalysis').classList.contains('hidden')) {
+                    updateEmotionAnalysis(data.sentiment);
+                }
+            } catch (error) {
+                addMessage('Sorry, there was an error processing your request.', 'ai');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        });
+
+        // Handle image upload
+        document.getElementById('imageInput').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Show loading
+            loading.classList.remove('hidden');
+
+            try {
+                // Create FormData
+                const formData = new FormData();
+                formData.append('image', file);
+
+                // Send request to AI
+                const response = await fetch('/process_image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                // Display image preview
+                const preview = document.getElementById('imagePreview');
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                img.className = 'image-preview';
+                preview.innerHTML = '';
+                preview.appendChild(img);
+
+                // Add analysis results
+                addMessage(`Image analysis: ${JSON.stringify(data)}`, 'ai');
+            } catch (error) {
+                addMessage('Sorry, there was an error processing your image.', 'ai');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        });
+
+        function addMessage(message, sender) {
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble ${sender}-bubble`;
+            bubble.innerHTML = message;
+            chatArea.appendChild(bubble);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function updateEmotionAnalysis(sentiment) {
+            const positiveBar = document.getElementById('positiveBar');
+            const negativeBar = document.getElementById('negativeBar');
+            const neutralBar = document.getElementById('neutralBar');
+
+            // Update emotion bars
+            positiveBar.style.width = `${sentiment.pos * 100}%`;
+            negativeBar.style.width = `${sentiment.neg * 100}%`;
+            neutralBar.style.width = `${sentiment.neu * 100}%`;
+        }
+    </script>
+</body>
+</html>
